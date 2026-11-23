@@ -100,9 +100,13 @@ const scrapeCatalog = async (token: string): Promise<RawListing[]> => {
         seen.add(p.id)
         consoles++
         let bb = p.buy_box_winner
-        if (bb === undefined) {
+        if (!bb) {
           const r = await fetch(`https://api.mercadolibre.com/products/${p.id}`, { headers, signal: AbortSignal.timeout(30_000) })
-          if (r.ok) bb = ((await r.json()) as CatalogProduct).buy_box_winner
+          if (r.ok) {
+            const full = (await r.json()) as CatalogProduct & Record<string, unknown>
+            bb = full.buy_box_winner
+            if (consoles <= 3) mlDiagnostics.push(`producto ${p.id} keys=${Object.keys(full).join("|")} bb=${JSON.stringify(bb ?? null).slice(0, 120)}`)
+          } else if (consoles <= 3) mlDiagnostics.push(`producto ${p.id} -> ${r.status}`)
         }
         if (!bb || typeof bb.price !== "number") continue
         withPrice++
@@ -191,8 +195,10 @@ export const scrapeMercadoLibre = async (browser: Browser): Promise<MlResult> =>
           headers: { "Content-Type": "application/json", Authorization: `Basic ${token}` },
           signal: AbortSignal.timeout(150_000),
         })
+        mlDiagnostics.push(`decodo "${q}" -> ${res.status}`)
         if (!res.ok) continue
         const html: string = (await res.json()).results?.[0]?.content ?? ""
+        mlDiagnostics.push(`decodo html=${html.length}B ${/account-verification|Soy nuevo/.test(html) ? "login-wall" : ""}`)
         await p2.setContent(html, { waitUntil: "domcontentloaded" })
         listings.push(...toListings(await extract(p2)))
       }
