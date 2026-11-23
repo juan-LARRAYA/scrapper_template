@@ -45,7 +45,7 @@ const main = async () => {
       statuses.push({
         site: "facebook",
         status: r.listings.length ? "ok" : r.blocked ? "bloqueado" : "error",
-        message: r.blocked && !r.listings.length ? "muro de login / sin resultados" : r.errors.slice(0, 2).join("; "),
+        message: r.errors.slice(0, 2).join("; ") || (r.blocked ? "muro de login / sin resultados" : ""),
         rawCount: r.listings.length,
       })
     }
@@ -77,7 +77,8 @@ const main = async () => {
   console.log(renderSummary(summary))
 
   if (flag("json")) console.log(JSON.stringify({ summary, listings: kept }, null, 2))
-  if (save) {
+  if (save && kept.length === 0) console.log("\nSin avisos validos: no se guarda la corrida (para no ensuciar el historial).")
+  else if (save) {
     await initPs5Db()
     const id = await saveRun(summary, kept)
     console.log(`\nCorrida #${id} guardada en ${process.env.PS5_DB_URL ?? "data/ps5.db"}`)

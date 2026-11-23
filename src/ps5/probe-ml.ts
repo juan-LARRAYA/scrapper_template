@@ -43,3 +43,26 @@ for (const withAuth of tk ? [false, true] : [false]) {
     }
   }
 }
+
+// Catalogo de productos (con token): buscar PS5 y ver si hay ofertas con precio
+if (tk) {
+  const get = async (u: string) => {
+    const r = await fetch(u, { headers: { Authorization: `Bearer ${tk}`, Accept: "application/json" } })
+    const t = await r.text()
+    let j: any = null
+    try { j = JSON.parse(t) } catch { /* no json */ }
+    return { status: r.status, j, t }
+  }
+  const s = await get("https://api.mercadolibre.com/products/search?status=active&site_id=MLA&q=playstation%205%20consola&limit=10")
+  console.log(`products/search -> ${s.status} keys=${Object.keys(s.j ?? {}).join(",")} n=${s.j?.results?.length}`)
+  for (const p of (s.j?.results ?? []).slice(0, 6)) console.log(`  product ${p.id} | ${p.name} | domain=${p.domain_id}`)
+  const id = s.j?.results?.[0]?.id
+  if (id) {
+    for (const path of [`products/${id}`, `products/${id}/items`, `products/${id}/items?limit=10`]) {
+      const r = await get(`https://api.mercadolibre.com/${path}`)
+      console.log(`${path} -> ${r.status} ${r.t.slice(0, 400).replace(/\s+/g, " ")}`)
+    }
+    const m = await get(`https://api.mercadolibre.com/sites/MLA/search?product_id=${id}&limit=5`)
+    console.log(`sites/MLA/search?product_id -> ${m.status} ${m.t.slice(0, 200)}`)
+  }
+}

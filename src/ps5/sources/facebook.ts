@@ -41,7 +41,11 @@ export const scrapeFacebook = async (
           text: (a as HTMLElement).innerText ?? "",
         })),
       )
-      if (cards.length === 0) { blocked = true; continue }
+      if (cards.length === 0) {
+        blocked = true
+        errors.push(`FB "${q}": 0 tarjetas (titulo="${(await page.title()).slice(0, 40)}", url=${page.url().slice(0, 60)})`)
+        continue
+      }
       for (const c of cards) {
         const id = c.href.match(/\/marketplace\/item\/(\d+)/)?.[1]
         if (!id) continue

@@ -66,6 +66,9 @@ export const scrapeAmazon = async (browser: Browser, stores: string[], pages = 2
               href: el.querySelector("h2 a, a.a-link-normal.s-no-outline")?.getAttribute("href") ?? null,
             })),
           )
+          if (cards.length === 0) {
+            errors.push(`${cfg.host} "${q}" p${n}: 0 resultados (titulo="${(await page.title()).slice(0, 60)}")`)
+          }
           for (const c of cards) {
             if (!c.asin || !c.title) continue
             listings.push({
