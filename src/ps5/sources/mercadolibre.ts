@@ -189,13 +189,18 @@ export const scrapeMercadoLibre = async (browser: Browser): Promise<MlResult> =>
     const p2 = await ctx2.newPage()
     try {
       for (const q of QUERIES) {
-        const res = await fetch("https://scraper-api.decodo.com/v2/scrape", {
-          method: "POST",
-          body: JSON.stringify({ target: "universal", url: listUrl(q), parse: false, headless: "html" }),
-          headers: { "Content-Type": "application/json", Authorization: `Basic ${token}` },
-          signal: AbortSignal.timeout(150_000),
-        })
-        mlDiagnostics.push(`decodo "${q}" -> ${res.status}`)
+        let res!: Response
+        for (let attempt = 0; attempt < 3; attempt++) {
+          res = await fetch("https://scraper-api.decodo.com/v2/scrape", {
+            method: "POST",
+            body: JSON.stringify({ target: "universal", url: listUrl(q), parse: false, headless: "html" }),
+            headers: { "Content-Type": "application/json", Authorization: `Basic ${token}` },
+            signal: AbortSignal.timeout(150_000),
+          })
+          mlDiagnostics.push(`decodo "${q}" try${attempt + 1} -> ${res.status}${res.ok ? "" : " " + (await res.text()).slice(0, 120)}`)
+          if (res.status !== 429) break
+          await new Promise((r) => setTimeout(r, 20_000))
+        }
         if (!res.ok) continue
         const html: string = (await res.json()).results?.[0]?.content ?? ""
         mlDiagnostics.push(`decodo html=${html.length}B ${/account-verification|Soy nuevo/.test(html) ? "login-wall" : ""}`)
