@@ -30,3 +30,7 @@ pnpm-debug.log*
 
 # keep a single lockfile manager
 package-lock.json
+
+# datos locales del tracker PS5 y sesiones
+data/
+*.storage-state.json

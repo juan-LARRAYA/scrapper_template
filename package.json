@@ -12,13 +12,16 @@
     "astro": "astro",
     "track": "tsx src/tracker/index.ts",
     "track:manual": "tsx src/tracker/manual-scraper.ts",
-    "track:proxy": "tsx src/tracker/proxy-scraper.ts"
+    "track:proxy": "tsx src/tracker/proxy-scraper.ts",
+    "ps5": "tsx src/ps5/run.ts",
+    "ps5:history": "tsx src/ps5/history.ts"
   },
   "dependencies": {
     "@libsql/client": "0.15.15",
     "astro": "6.2.1",
     "dotenv": "17.2.3",
-    "lightweight-charts": "^5.2.0"
+    "lightweight-charts": "^5.2.0",
+    "playwright-core": "^1.65.1"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",

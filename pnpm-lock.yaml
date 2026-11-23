@@ -20,6 +20,9 @@ importers:
       lightweight-charts:
         specifier: ^5.2.0
         version: 5.2.0
+      playwright-core:
+        specifier: ^1.65.1
+        version: 1.65.1
     devDependencies:
       '@types/node':
         specifier: ^24.7.2
@@ -1356,6 +1359,11 @@ packages:
     resolution: {integrity: sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A==}
     engines: {node: '>=12'}
 
+  playwright-core@1.65.1:
+    resolution: {integrity: sha512-hqPpz7blSMPxWVdoeE1yiBSzXsKiVOd2k+kjCvmUywD2GPO2Dd9HfcWnq9NN0GHbNZDFgZ9JfBFr+X5/BLo0qw==}
+    engines: {node: '>=20'}
+    hasBin: true
+
   postcss@8.5.8:
     resolution: {integrity: sha512-OW/rX8O/jXnm82Ey1k44pObPtdblfiuWnrd8X7GJ7emImCOstunGbXUpp7HdBrFQX6rJzn3sPT397Wp5aCwCHg==}
     engines: {node: ^10 || ^12 || >=14}
@@ -1497,6 +1505,7 @@ packages:
   tsconfck@3.1.6:
     resolution: {integrity: sha512-ks6Vjr/jEw0P1gmOVwutM3B7fWxoWBL2KRDb1JfqGVawBmO5UsvmWOQFGHBPl5yxYz4eERr19E6L7NMv+Fej4w==}
     engines: {node: ^18 || >=20}
+    deprecated: unmaintained
     hasBin: true
     peerDependencies:
       typescript: ^5.0.0
@@ -3164,6 +3173,8 @@ snapshots:
   picomatch@2.3.2: {}
 
   picomatch@4.0.4: {}
+
+  playwright-core@1.65.1: {}
 
   postcss@8.5.8:
     dependencies:

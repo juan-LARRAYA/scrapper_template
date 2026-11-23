@@ -1,0 +1,86 @@
+---
+import Layout from "../layouts/Layout.astro"
+import { MODEL_LABEL, SITE_LABEL, fmt } from "../ps5/format.js"
+import { getRuns, getRunListings, initPs5Db } from "../ps5/store.js"
+import type { StoredRun } from "../ps5/store.js"
+
+let runs: StoredRun[] = []
+let listings: Awaited<ReturnType<typeof getRunListings>> = []
+let error: string | null = null
+try {
+  await initPs5Db()
+  runs = await getRuns(30)
+  if (runs[0]) listings = await getRunListings(runs[0].id)
+} catch (e) {
+  error = e instanceof Error ? e.message : "Error leyendo la base"
+}
+const last = runs[0]
+const models = ["pro", "standard"] as const
+---
+
+<Layout title="PS5 Price Tracker" description="Precios de PS5 Pro y PS5 comun en Amazon, Facebook Marketplace y Mercado Libre.">
+  <main class="page">
+    <h1>PS5 Price Tracker</h1>
+    {error && <p class="warn">{error}</p>}
+    {!last && !error && <p>Sin corridas guardadas. Ejecuta <code>pnpm ps5</code>.</p>}
+    {last && (
+      <>
+        <p class="meta">Ultima corrida #{last.id} · {last.summary.startedAt} · {last.summary.kept} avisos validos · {last.summary.duplicates} duplicados descartados</p>
+        <ul class="status">
+          {last.summary.statuses.map((s) => <li class={s.status}><b>{SITE_LABEL[s.site]}</b>: {s.status} ({s.rawCount}) {s.message}</li>)}
+        </ul>
+        {models.map((m) => (
+          <section>
+            <h2>{MODEL_LABEL[m]}</h2>
+            <table>
+              <thead><tr><th>Sitio</th><th>Moneda</th><th>Avisos</th><th>Promedio</th><th>Minimo</th><th>Maximo</th></tr></thead>
+              <tbody>
+                {last.summary.stats.filter((s) => s.model === m).map((s) => (
+                  <tr class={s.site === null ? "total" : ""}>
+                    <td>{s.site ? SITE_LABEL[s.site] : "TOTAL"}</td><td>{s.currency}</td><td>{s.count}</td>
+                    <td>{fmt(s.avg, s.currency)}</td><td>{fmt(s.min, s.currency)}</td><td>{fmt(s.max, s.currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        ))}
+        <section>
+          <h2>Historial de corridas</h2>
+          <table>
+            <thead><tr><th>#</th><th>Fecha</th><th>Modelo</th><th>Moneda</th><th>Avisos</th><th>Promedio</th><th>Min</th><th>Max</th></tr></thead>
+            <tbody>
+              {runs.flatMap((r) => r.summary.stats.filter((s) => s.site === null).map((s) => (
+                <tr><td>{r.id}</td><td>{r.summary.startedAt.slice(0, 16).replace("T", " ")}</td><td>{MODEL_LABEL[s.model]}</td><td>{s.currency}</td><td>{s.count}</td><td>{fmt(s.avg, s.currency)}</td><td>{fmt(s.min, s.currency)}</td><td>{fmt(s.max, s.currency)}</td></tr>
+              )))}
+            </tbody>
+          </table>
+        </section>
+        <section>
+          <h2>Avisos de la ultima corrida</h2>
+          <table>
+            <thead><tr><th>Modelo</th><th>Sitio</th><th>Precio</th><th>Titulo</th></tr></thead>
+            <tbody>
+              {listings.map((l) => (
+                <tr><td>{l.model === "pro" ? "Pro" : "Comun"}</td><td>{SITE_LABEL[l.site as keyof typeof SITE_LABEL] ?? l.site}</td><td>{fmt(l.price, l.currency)}</td>
+                  <td>{l.url ? <a href={l.url} rel="noopener noreferrer">{l.title}</a> : l.title}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      </>
+    )}
+  </main>
+</Layout>
+
+<style>
+  .page { max-width: 1000px; margin: 0 auto; padding: 24px 16px; color: #e4e4e7; font-family: system-ui, sans-serif; }
+  h1 { margin: 0 0 4px; } h2 { margin-top: 28px; }
+  .meta { color: #a1a1aa; }
+  .status { list-style: none; padding: 0; } .status li { margin: 2px 0; }
+  .status .bloqueado, .status .error { color: #fbbf24; } .status .ok { color: #4ade80; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; display: block; overflow-x: auto; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #27272a; white-space: nowrap; }
+  td:last-child { white-space: normal; } tr.total td { font-weight: 600; background: #18181b; }
+  a { color: #93c5fd; } .warn { color: #fca5a5; }
+</style>
