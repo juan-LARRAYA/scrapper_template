@@ -33,7 +33,7 @@ Una corrida tarda ~1 minuto (navegador headless con perfil efimero).
 
 ### Ejecucion programada (GitHub Actions)
 
-`ci/track-ps5-prices.yml` (copiar a `.github/workflows/` -- el token de `gh` usado para pushear no tenia scope `workflow`, y GitHub rechaza pushear ahi sin ese scope; ver abajo) corre `pnpm ps5` cada 6 horas (`0 */6 * * *`) y a pedido
+`.github/workflows/track-ps5-prices.yml` corre `pnpm ps5` cada 6 horas (`0 */6 * * *`) y a pedido
 (`workflow_dispatch`): instala Chromium con `playwright-core install --with-deps chromium`, ejecuta un
 diagnostico de Mercado Libre (`pnpm ps5:probe-ml`, status HTTP de cada via) y luego el tracker. El resumen
 queda en el "Job summary" de la corrida.
@@ -48,8 +48,6 @@ del momento del build.
 Secrets usados: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` (ya existen), `ML_APP_ID`, `ML_APP_SECRET`,
 `DECODO_AUTH_TOKEN` (ya existen, opcionales) y **`ML_STORAGE_STATE`** (nuevo, opcional: JSON de sesion de
 Playwright de una cuenta de ML, exportado por vos; es la salida si ML sigue pidiendo verificacion).
-
-**Activarlo:** `mkdir -p .github/workflows && git mv ci/track-ps5-prices.yml .github/workflows/` y pushear con una sesion con scope `workflow` (`gh auth refresh -s workflow`). Para dispararlo a mano: `gh workflow run track-ps5-prices.yml`.
 
 ### Mercado Libre: vias probadas
 
