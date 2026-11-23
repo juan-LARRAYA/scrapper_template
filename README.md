@@ -49,12 +49,38 @@ Secrets usados: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` (ya existen), `ML_APP_I
 `DECODO_AUTH_TOKEN` (ya existen, opcionales) y **`ML_STORAGE_STATE`** (nuevo, opcional: JSON de sesion de
 Playwright de una cuenta de ML, exportado por vos; es la salida si ML sigue pidiendo verificacion).
 
-### Mercado Libre: vias probadas
+### Mercado Libre: vias probadas (evidencia de GitHub Actions, 2026-11-23)
 
-Orden de intentos en `src/ps5/sources/mercadolibre.ts`: (1) API `sites/MLA/search` con token de app
-(`ML_APP_ID`/`ML_APP_SECRET`, client_credentials) o anonima, (2) navegador con `ML_STORAGE_STATE` si existe,
-(3) navegador anonimo, (4) Decodo. `pnpm ps5:probe-ml` imprime el status de cada endpoint. Resultados y
-estado actual: ver la seccion de estado por sitio de mas abajo y el resultado de la ultima corrida en Actions.
+`pnpm ps5:probe-ml` imprime el status de cada via. Resultados reales desde el runner de Actions:
+
+| Via | Respuesta |
+| --- | --- |
+| `oauth/token` client_credentials (`ML_APP_ID`/`ML_APP_SECRET`) | 200, token OK |
+| `api/sites/MLA/search` (anonimo y con token) | 403 |
+| `api/items/{id}`, `sites/MLA/search?product_id=` | 403 |
+| `api/products/search?site_id=MLA&q=ps5` con token | 200: devuelve catalogo (57 productos de `MLA-GAME_CONSOLES` encontrados) |
+| `api/products/{id}` | 200, pero `buy_box_winner = null` (sin precio) |
+| `api/products/{id}/items` | 403 `PA_UNAUTHORIZED_RESULT_FROM_POLICIES` |
+| `listado/articulo/jm` en `.com.ar`, `.com.mx`, `.cl` | redirigen a `/gz/account-verification` |
+| Navegador headless (runner e IP local) | `/gz/account-verification` |
+| Decodo (`DECODO_AUTH_TOKEN`) | 429 de limite de uso en los 3 reintentos |
+
+Conclusion: el token de app solo permite leer el **catalogo** (nombres, sin precios). No hay forma de obtener
+precios de ML sin una sesion de usuario. Camino pendiente: cargar el secret **`ML_STORAGE_STATE`** (JSON de
+`storageState` de Playwright de una sesion propia de ML; ver abajo) o resolver el limite de Decodo. El workflow
+ya los usa si existen; mientras tanto ML se informa como BLOQUEADO sin romper la corrida.
+
+Como generar `ML_STORAGE_STATE` (en tu PC, nunca se commitea): abrir un Chromium con Playwright, loguearte en
+mercadolibre.com.ar, ejecutar `context.storageState({ path: "ml-state.json" })` y pegar el contenido en el
+secret (`gh secret set ML_STORAGE_STATE < ml-state.json`). Los selectores de listado de ML estan escritos de
+memoria y no se pudieron probar con sesion.
+
+### Actions: Amazon y Facebook desde el runner
+
+En el runner de GitHub (IP de datacenter) **Amazon** devolvio "Sorry! Something went wrong!" (0 resultados) y
+**Facebook Marketplace** redirigio a `/login/` (0 tarjetas); ambos funcionan desde una IP residencial. Por eso
+la corrida de Actions termina OK pero sin avisos validos y no guarda corridas vacias. Para usar el tracker
+programado con datos reales hay que correrlo desde un runner self-hosted / IP residencial o con proxy.
 
 ### Estado por sitio y limitaciones
 
