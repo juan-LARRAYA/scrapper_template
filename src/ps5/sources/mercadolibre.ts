@@ -50,7 +50,65 @@ const toListings = (cards: Awaited<ReturnType<typeof extract>>): RawListing[] =>
 
 const listUrl = (q: string) => `https://listado.mercadolibre.com.ar/${q.trim().replace(/\s+/g, "-")}`
 
+type ApiItem = { id?: string; title?: string; price?: number; currency_id?: string; permalink?: string }
+
+/** Log de diagnostico de cada intento (status HTTP), util para ver que via funciona en CI. */
+export const mlDiagnostics: string[] = []
+
+const getAppToken = async (): Promise<string | null> => {
+  const id = process.env.ML_APP_ID, secret = process.env.ML_APP_SECRET
+  if (!id || !secret) return null
+  try {
+    const res = await fetch("https://api.mercadolibre.com/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      body: new URLSearchParams({ grant_type: "client_credentials", client_id: id, client_secret: secret }),
+      signal: AbortSignal.timeout(30_000),
+    })
+    mlDiagnostics.push(`oauth client_credentials -> ${res.status}`)
+    return res.ok ? ((await res.json()) as { access_token?: string }).access_token ?? null : null
+  } catch (e) {
+    mlDiagnostics.push(`oauth error ${e instanceof Error ? e.message : e}`)
+    return null
+  }
+}
+
+/** API publica de busqueda (con token de app si hay ML_APP_ID/ML_APP_SECRET, y anonima si no). */
+const scrapeApi = async (): Promise<RawListing[]> => {
+  const token = await getAppToken()
+  const out: RawListing[] = []
+  for (const q of QUERIES) {
+    for (const offset of [0, 50]) {
+      const url = `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(q)}&limit=50&offset=${offset}`
+      try {
+        const res = await fetch(url, {
+          headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          signal: AbortSignal.timeout(30_000),
+        })
+        mlDiagnostics.push(`search "${q}" off=${offset} ${token ? "con token" : "anonimo"} -> ${res.status}`)
+        if (!res.ok) break
+        const data = (await res.json()) as { results?: ApiItem[] }
+        for (const it of data.results ?? []) {
+          if (!it.title) continue
+          out.push({
+            site: "mercadolibre", source: "api MLA", title: it.title,
+            price: typeof it.price === "number" ? it.price : null,
+            currency: it.currency_id ?? "ARS", url: it.permalink ?? null, externalId: it.id ?? null,
+          })
+        }
+      } catch (e) {
+        mlDiagnostics.push(`search error ${e instanceof Error ? e.message : e}`)
+        break
+      }
+    }
+  }
+  return out
+}
+
 export const scrapeMercadoLibre = async (browser: Browser): Promise<MlResult> => {
+  const api = await scrapeApi()
+  if (api.length > 0) return { listings: api, blocked: false, message: "via API oficial" }
+
   const storage = process.env.ML_STORAGE_STATE
   const storageState = storage && existsSync(storage) ? storage : undefined
   const ctx = await newContext(browser, { storageState })
@@ -99,6 +157,7 @@ export const scrapeMercadoLibre = async (browser: Browser): Promise<MlResult> =>
     listings,
     blocked: true,
     message:
+      `[${mlDiagnostics.join("; ")}] ` +
       "ML exige verificacion de cuenta (/gz/account-verification) y su API devuelve 403. " +
       "Opciones: exportar una sesion propia en ML_STORAGE_STATE o definir DECODO_AUTH_TOKEN.",
   }

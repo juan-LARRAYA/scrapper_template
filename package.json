@@ -14,7 +14,8 @@
     "track:manual": "tsx src/tracker/manual-scraper.ts",
     "track:proxy": "tsx src/tracker/proxy-scraper.ts",
     "ps5": "tsx src/ps5/run.ts",
-    "ps5:history": "tsx src/ps5/history.ts"
+    "ps5:history": "tsx src/ps5/history.ts",
+    "ps5:probe-ml": "tsx src/ps5/probe-ml.ts"
   },
   "dependencies": {
     "@libsql/client": "0.15.15",

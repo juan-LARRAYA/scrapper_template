@@ -1,0 +1,62 @@
+name: Track PS5 prices
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: track-ps5
+  cancel-in-progress: false
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright-core install --with-deps chromium
+
+      - name: Probe Mercado Libre (diagnostico)
+        continue-on-error: true
+        env:
+          ML_APP_ID: ${{ secrets.ML_APP_ID }}
+          ML_APP_SECRET: ${{ secrets.ML_APP_SECRET }}
+        run: pnpm ps5:probe-ml
+
+      - name: Run PS5 tracker
+        env:
+          PS5_PLAYWRIGHT_CHROMIUM: "1"
+          # Historial persistente en Turso (mismos secrets que el tracker original)
+          PS5_DB_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          PS5_DB_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+          ML_APP_ID: ${{ secrets.ML_APP_ID }}
+          ML_APP_SECRET: ${{ secrets.ML_APP_SECRET }}
+          DECODO_AUTH_TOKEN: ${{ secrets.DECODO_AUTH_TOKEN }}
+          # Opcional: sesion de ML exportada por Juan (JSON de Playwright)
+          ML_STORAGE_STATE_JSON: ${{ secrets.ML_STORAGE_STATE }}
+        run: |
+          if [ -n "$ML_STORAGE_STATE_JSON" ]; then
+            printf '%s' "$ML_STORAGE_STATE_JSON" > "$RUNNER_TEMP/ml-state.json"
+            export ML_STORAGE_STATE="$RUNNER_TEMP/ml-state.json"
+          fi
+          pnpm ps5 | tee "$GITHUB_STEP_SUMMARY"

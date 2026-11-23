@@ -16,6 +16,33 @@ try {
 }
 const last = runs[0]
 const models = ["pro", "standard"] as const
+
+// Evolucion del promedio total por modelo y moneda (corridas en orden cronologico)
+const chrono = [...runs].reverse()
+const currencies = [...new Set(runs.flatMap((r) => r.summary.stats.map((s) => s.currency)))]
+const W = 640, H = 180, PAD = 8
+const COLORS = { pro: "#f472b6", standard: "#60a5fa" } as const
+const charts = currencies.map((cur) => {
+  const series = models.map((m) => ({
+    m,
+    pts: chrono.map((r, i) => {
+      const st = r.summary.stats.find((s) => s.site === null && s.model === m && s.currency === cur)
+      return st ? { i, avg: st.avg } : null
+    }),
+  }))
+  const vals = series.flatMap((s) => s.pts.filter(Boolean).map((p) => p!.avg))
+  const lo = Math.min(...vals), hi = Math.max(...vals)
+  const x = (i: number) => PAD + (chrono.length < 2 ? (W - 2 * PAD) / 2 : (i * (W - 2 * PAD)) / (chrono.length - 1))
+  const y = (v: number) => H - PAD - (hi === lo ? (H - 2 * PAD) / 2 : ((v - lo) / (hi - lo)) * (H - 2 * PAD))
+  return {
+    cur, lo, hi,
+    lines: series.map((s) => ({
+      m: s.m,
+      points: s.pts.filter(Boolean).map((p) => `${x(p!.i)},${y(p!.avg)}`).join(" "),
+      dots: s.pts.filter(Boolean).map((p) => ({ cx: x(p!.i), cy: y(p!.avg) })),
+    })),
+  }
+}).filter((c) => Number.isFinite(c.lo))
 ---
 
 <Layout title="PS5 Price Tracker" description="Precios de PS5 Pro y PS5 comun en Amazon, Facebook Marketplace y Mercado Libre.">
@@ -45,6 +72,23 @@ const models = ["pro", "standard"] as const
             </table>
           </section>
         ))}
+        <section>
+          <h2>Evolucion del promedio (total por moneda)</h2>
+          {charts.map((c) => (
+            <figure>
+              <figcaption>{c.cur}: min {fmt(c.lo, c.cur)} - max {fmt(c.hi, c.cur)} · {runs.length} corrida(s)</figcaption>
+              <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Evolucion del precio promedio en ${c.cur}`}>
+                {c.lines.map((l) => (
+                  <>
+                    <polyline points={l.points} fill="none" stroke={COLORS[l.m]} stroke-width="2" />
+                    {l.dots.map((d) => <circle cx={d.cx} cy={d.cy} r="3" fill={COLORS[l.m]} />)}
+                  </>
+                ))}
+              </svg>
+              <p class="legend"><span style={`color:${COLORS.pro}`}>● PS5 Pro</span> <span style={`color:${COLORS.standard}`}>● PS5 comun</span></p>
+            </figure>
+          ))}
+        </section>
         <section>
           <h2>Historial de corridas</h2>
           <table>
@@ -82,5 +126,6 @@ const models = ["pro", "standard"] as const
   table { width: 100%; border-collapse: collapse; font-size: 14px; display: block; overflow-x: auto; }
   th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #27272a; white-space: nowrap; }
   td:last-child { white-space: normal; } tr.total td { font-weight: 600; background: #18181b; }
+  figure { margin: 12px 0; } figcaption, .legend { color: #a1a1aa; font-size: 13px; } svg { width: 100%; max-width: 640px; background: #18181b; border-radius: 6px; }
   a { color: #93c5fd; } .warn { color: #fca5a5; }
 </style>

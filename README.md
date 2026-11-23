@@ -31,6 +31,33 @@ Una corrida tarda ~1 minuto (navegador headless con perfil efimero).
   tambien soporta Turso via `PS5_DB_URL`/`PS5_DB_TOKEN`.
 - Las monedas **no se mezclan**: las estadisticas y el total se calculan por moneda (USD, ARS...).
 
+### Ejecucion programada (GitHub Actions)
+
+`ci/track-ps5-prices.yml` (copiar a `.github/workflows/` -- el token de `gh` usado para pushear no tenia scope `workflow`, y GitHub rechaza pushear ahi sin ese scope; ver abajo) corre `pnpm ps5` cada 6 horas (`0 */6 * * *`) y a pedido
+(`workflow_dispatch`): instala Chromium con `playwright-core install --with-deps chromium`, ejecuta un
+diagnostico de Mercado Libre (`pnpm ps5:probe-ml`, status HTTP de cada via) y luego el tracker. El resumen
+queda en el "Job summary" de la corrida.
+
+**Historial persistente:** en Actions la corrida escribe en Turso reutilizando los secrets que ya usa el
+repo (`TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN`, mapeados a `PS5_DB_URL` / `PS5_DB_TOKEN`) en tablas propias
+(`ps5_runs`, `ps5_listings`), sin tocar las del tracker original. Para verlo: poner esas mismas variables
+(`PS5_DB_URL`, `PS5_DB_TOKEN`) en `.env` y correr `pnpm dev` -> `/ps5` (grafico de evolucion del promedio por
+modelo y moneda, tabla de historial y avisos de la ultima corrida). `pnpm build` genera la pagina con los datos
+del momento del build.
+
+Secrets usados: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` (ya existen), `ML_APP_ID`, `ML_APP_SECRET`,
+`DECODO_AUTH_TOKEN` (ya existen, opcionales) y **`ML_STORAGE_STATE`** (nuevo, opcional: JSON de sesion de
+Playwright de una cuenta de ML, exportado por vos; es la salida si ML sigue pidiendo verificacion).
+
+**Activarlo:** `mkdir -p .github/workflows && git mv ci/track-ps5-prices.yml .github/workflows/` y pushear con una sesion con scope `workflow` (`gh auth refresh -s workflow`). Para dispararlo a mano: `gh workflow run track-ps5-prices.yml`.
+
+### Mercado Libre: vias probadas
+
+Orden de intentos en `src/ps5/sources/mercadolibre.ts`: (1) API `sites/MLA/search` con token de app
+(`ML_APP_ID`/`ML_APP_SECRET`, client_credentials) o anonima, (2) navegador con `ML_STORAGE_STATE` si existe,
+(3) navegador anonimo, (4) Decodo. `pnpm ps5:probe-ml` imprime el status de cada endpoint. Resultados y
+estado actual: ver la seccion de estado por sitio de mas abajo y el resultado de la ultima corrida en Actions.
+
 ### Estado por sitio y limitaciones
 
 | Sitio | Estado | Detalle |

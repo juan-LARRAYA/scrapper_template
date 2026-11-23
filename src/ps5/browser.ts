@@ -15,7 +15,8 @@ export const UA =
 
 /** Lanza Chromium headless con perfil efimero (nunca toca perfiles reales). */
 export const launchBrowser = async (): Promise<Browser> => {
-  const executablePath = CANDIDATES.find((p) => existsSync(p))
+  // PS5_PLAYWRIGHT_CHROMIUM=1 (CI): usar el Chromium que instala `playwright install`
+  const executablePath = process.env.PS5_PLAYWRIGHT_CHROMIUM ? undefined : CANDIDATES.find((p) => existsSync(p))
   return chromium.launch({
     executablePath,
     headless: true,
