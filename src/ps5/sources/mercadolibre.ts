@@ -74,6 +74,52 @@ const getAppToken = async (): Promise<string | null> => {
 }
 
 /** API publica de busqueda (con token de app si hay ML_APP_ID/ML_APP_SECRET, y anonima si no). */
+type CatalogProduct = {
+  id?: string; name?: string; domain_id?: string
+  buy_box_winner?: { item_id?: string; price?: number; currency_id?: string } | null
+}
+
+/**
+ * Via catalogo: con token de app, `products/search` responde 200 (sites/MLA/search da 403).
+ * Cada producto de catalogo trae `buy_box_winner` (oferta ganadora con precio). Da UN precio
+ * por producto de catalogo (no todos los avisos), pero es precio real publicado.
+ */
+const scrapeCatalog = async (token: string): Promise<RawListing[]> => {
+  const out: RawListing[] = []
+  const headers = { Accept: "application/json", Authorization: `Bearer ${token}` }
+  const seen = new Set<string>()
+  let withPrice = 0, consoles = 0
+  for (const q of ["consola playstation 5", "ps5 pro", "playstation 5 slim", "ps5 digital"]) {
+    try {
+      const res = await fetch(`https://api.mercadolibre.com/products/search?status=active&site_id=MLA&q=${encodeURIComponent(q)}&limit=50`, { headers, signal: AbortSignal.timeout(30_000) })
+      mlDiagnostics.push(`catalogo "${q}" -> ${res.status}`)
+      if (!res.ok) continue
+      const results = ((await res.json()) as { results?: CatalogProduct[] }).results ?? []
+      for (const p of results) {
+        if (!p.id || !p.name || seen.has(p.id) || p.domain_id !== "MLA-GAME_CONSOLES") continue
+        seen.add(p.id)
+        consoles++
+        let bb = p.buy_box_winner
+        if (bb === undefined) {
+          const r = await fetch(`https://api.mercadolibre.com/products/${p.id}`, { headers, signal: AbortSignal.timeout(30_000) })
+          if (r.ok) bb = ((await r.json()) as CatalogProduct).buy_box_winner
+        }
+        if (!bb || typeof bb.price !== "number") continue
+        withPrice++
+        out.push({
+          site: "mercadolibre", source: "api MLA catalogo", title: p.name, price: bb.price,
+          currency: bb.currency_id ?? "ARS", url: `https://www.mercadolibre.com.ar/p/${p.id}`,
+          externalId: bb.item_id ?? p.id,
+        })
+      }
+    } catch (e) {
+      mlDiagnostics.push(`catalogo error ${e instanceof Error ? e.message : e}`)
+    }
+  }
+  mlDiagnostics.push(`catalogo: ${consoles} consolas, ${withPrice} con buy_box_winner con precio`)
+  return out
+}
+
 const scrapeApi = async (): Promise<RawListing[]> => {
   const token = await getAppToken()
   const out: RawListing[] = []
@@ -86,7 +132,10 @@ const scrapeApi = async (): Promise<RawListing[]> => {
           signal: AbortSignal.timeout(30_000),
         })
         mlDiagnostics.push(`search "${q}" off=${offset} ${token ? "con token" : "anonimo"} -> ${res.status}`)
-        if (!res.ok) break
+        if (!res.ok) {
+          if (token && res.status === 403 && out.length === 0) return scrapeCatalog(token)
+          break
+        }
         const data = (await res.json()) as { results?: ApiItem[] }
         for (const it of data.results ?? []) {
           if (!it.title) continue
