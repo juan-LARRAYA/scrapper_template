@@ -3,7 +3,6 @@ name: Track PS5 prices
 on:
   push:
     branches: [feat/ps5-price-tracker]
-    paths: [".github/workflows/track-ps5-prices.yml"]
   schedule:
     - cron: "0 */6 * * *"
   workflow_dispatch:
